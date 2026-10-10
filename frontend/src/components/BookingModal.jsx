@@ -12,6 +12,20 @@ import { BookingDatePicker } from "./BookingDatePicker.jsx";
 import { Loading } from "./Loading.jsx";
 import { InlineError } from "./InlineError.jsx";
 
+/**
+ * The booking modal covers two states driven by `bookingFlow`:
+ *   - pre-booking: date picker + slot grid + selected-slot summary
+ *   - post-booking: confirmation view (bookingFlow.booking is set)
+ *
+ * Timezone model (important):
+ *   - The date picker walks the *mentor's* local calendar, because
+ *     availability is defined in the mentor's working hours.
+ *   - Slot times are rendered in the *viewer's* timezone, because
+ *     that's what the parent actually cares about.
+ *   - Because the two can be up to ~13 hours apart, a slot the parent
+ *     sees as "Fri 6:30 PM" may correspond to the mentor's Saturday.
+ *     That's why each slot carries its own weekday prefix.
+ */
 export function BookingModal({
   bookingFlow,
   viewerTimezone,
@@ -21,6 +35,10 @@ export function BookingModal({
   onConfirm,
 }) {
   const mentor = bookingFlow.mentor;
+  // Format the date-at-noon in UTC so the displayed weekday/month/day
+  // is stable regardless of the browser's timezone. Parsing a bare
+  // "YYYY-MM-DD" would be interpreted as local midnight and could roll
+  // to the previous day in negative-offset zones.
   const bookingDay = bookingFlow.availability?.date
     ? new Date(`${bookingFlow.availability.date}T12:00:00Z`).toLocaleDateString(
         undefined,
@@ -41,6 +59,9 @@ export function BookingModal({
           </span>
           <p className="eyebrow">You’re booked</p>
           <h3>{mentor.name}</h3>
+          {/* Confirmation shows the viewer's local time as primary.
+              The mentor's time is a muted secondary line so the parent
+              can reconcile if they ever compare notes with the mentor. */}
           <p className="confirmation-time">
             {formatInstant(bookingFlow.booking.startsAt, viewerTimezone)}
           </p>
@@ -74,12 +95,17 @@ export function BookingModal({
             </div>
             <div>
               <strong>{mentor.name}</strong>
+              {/* Mentor's home timezone shown here once, as reference.
+                  Slot times below are in the *viewer's* timezone. */}
               <span>{mentor.timezone}</span>
             </div>
             <span className="duration-label">
               <Clock3 size={15} /> 60 min
             </span>
           </div>
+          {/* Date picker uses the mentor's timezone: their availability
+              is defined on their own calendar, so picking a day "in
+              their week" is the only way to reach valid slots. */}
           <BookingDatePicker
             value={bookingFlow.date}
             min={todayInTimezone(mentor.timezone)}
@@ -100,6 +126,9 @@ export function BookingModal({
                     {viewerTimezone.replace(/_/g, " ")})
                   </p>
                 </div>
+                {/* Capacity counter — the number of trial classes this
+                    mentor can still take today, independent of how many
+                    free windows their schedule contains. */}
                 <span>
                   {bookingFlow.availability.remainingDailyBookings}{" "}
                   {bookingFlow.availability.remainingDailyBookings === 1
@@ -131,6 +160,10 @@ export function BookingModal({
                       }`}
                       onClick={() => onSlotSelect(slot)}
                     >
+                      {/* Each slot shows its own weekday prefix. Since
+                          the parent's calendar can differ from the
+                          mentor's, "Fri 6:30 PM" is unambiguous even
+                          when the picker above says "Saturday". */}
                       <span className="slot-time-primary">
                         {formatSlotWithDay(slot.startsAt, viewerTimezone)}
                       </span>
@@ -150,6 +183,9 @@ export function BookingModal({
                     viewerTimezone,
                   )}
                 </strong>
+                {/* Secondary line repeats the time in the mentor's
+                    zone so the parent has both frames of reference
+                    before confirming. */}
                 <span className="selected-summary-secondary">
                   Mentor's time:{" "}
                   {formatInstant(
