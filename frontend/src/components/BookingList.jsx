@@ -1,5 +1,7 @@
 import { CalendarDays } from "lucide-react";
-import { InlineError, Loading } from "../App";
+import { formatInstant } from "../lib/formatters.js";
+import { InlineError } from "./InlineError.jsx";
+import { Loading } from "./Loading.jsx";
 
 function BookingRow({ booking, role, onCancel }) {
   const mentor = typeof booking.mentorId === "object" ? booking.mentorId : null;

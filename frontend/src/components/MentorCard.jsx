@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { availabilitySummary, MENTOR_PORTRAITS } from "../App";
 import { ArrowRight, Clock3 } from "lucide-react";
+import { MENTOR_PORTRAITS } from "../constants/mentors.js";
+import { availabilitySummary } from "../lib/mentorUtils.js";
 
 export function MentorCard({ mentor, onBook, publicPreview = false }) {
   const [portraitUnavailable, setPortraitUnavailable] = useState(false);

@@ -1,15 +1,13 @@
 import { useEffect, useState } from "react";
-import {
-  availabilitySummary,
-  InlineError,
-  Loading,
-  MENTOR_PORTRAITS,
-  TypewriterHeadline,
-} from "../App";
-import { ArrowRight, Clock3, GraduationCap } from "lucide-react";
-import ThemeToggle from "../ThemeToggle";
-import { api } from "../lib/api";
-import { MentorCard } from "./MentorCard";
+import { ArrowRight, Clock3, GraduationCap, Users } from "lucide-react";
+import { api } from "../lib/api.js";
+import { availabilitySummary } from "../lib/mentorUtils.js";
+import { MENTOR_PORTRAITS } from "../constants/mentors.js";
+import ThemeToggle from "../ThemeToggle.jsx";
+import { MentorCard } from "./MentorCard.jsx";
+import { InlineError } from "./InlineError.jsx";
+import { Loading } from "./Loading.jsx";
+import { TypewriterHeadline } from "./TypewriterHeadline.jsx";
 
 export function HomeScreen({ onSignIn, onJoin }) {
   const [mentors, setMentors] = useState([]);

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   ArrowRight,
   Check,
@@ -5,10 +6,9 @@ import {
   LoaderCircle,
   Sparkles,
 } from "lucide-react";
-import ThemeToggle from "../ThemeToggle";
-import { InlineError } from "../App";
-import { useState } from "react";
-import { api } from "../lib/api";
+import ThemeToggle from "../ThemeToggle.jsx";
+import { InlineError } from "./InlineError.jsx";
+import { api } from "../lib/api.js";
 
 export function AuthScreen({
   onAuthenticated,
@@ -31,10 +31,9 @@ export function AuthScreen({
         mode === "register"
           ? await api.register({ name, email, password })
           : await api.login({ email, password });
-      onAuthenticated(result);
-      console.log(result);
       localStorage.setItem("authToken", result.token);
       localStorage.setItem("user", JSON.stringify(result.user));
+      onAuthenticated(result);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
