@@ -9,10 +9,22 @@ import { BookingModal } from "./components/BookingModal.jsx";
 import { CancelBookingModal } from "./components/CancelBookingModal.jsx";
 import { HomeScreen } from "./components/HomeScreen.jsx";
 import { AuthScreen } from "./components/AuthScreen.jsx";
+import { Loading } from "./components/Loading.jsx";
 import { Topbar } from "./components/TopBar.jsx";
+
+function decodeJwtPayload(token) {
+  try {
+    const [, payload] = token.split(".");
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(normalized));
+  } catch {
+    return null;
+  }
+}
 
 function App() {
   const [session, setSession] = useState(null);
+  const [restoring, setRestoring] = useState(true);
   const [authView, setAuthView] = useState(null);
   const [mentors, setMentors] = useState([]);
   const [mentorLoading, setMentorLoading] = useState(false);
@@ -27,6 +39,33 @@ function App() {
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelBusy, setCancelBusy] = useState(false);
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      setRestoring(false);
+      return;
+    }
+
+    const payload = decodeJwtPayload(token);
+    const expired = !payload?.exp || payload.exp * 1000 < Date.now();
+
+    if (!payload || expired) {
+      localStorage.removeItem("authToken");
+      setRestoring(false);
+      return;
+    }
+
+    setSession({
+      token,
+      user: {
+        _id: payload.sub ?? payload.id ?? payload._id,
+        name: payload.name,
+        role: payload.role,
+      },
+    });
+    setRestoring(false);
+  }, []);
 
   useEffect(() => {
     if (!session) return undefined;
@@ -151,12 +190,24 @@ function App() {
   }
 
   function signOut() {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("user");
     setSession(null);
     setAuthView(null);
     setMentors([]);
     setBookings([]);
     setBookingFlow(null);
     setNotice("");
+  }
+
+  if (restoring) {
+    return (
+      <main className="app-page">
+        <div className="app-shell">
+          <Loading label="Restoring session" />
+        </div>
+      </main>
+    );
   }
 
   if (!session) {
@@ -181,11 +232,6 @@ function App() {
   const subjects = [
     ...new Set(mentors.flatMap((mentor) => mentor.subjects)),
   ].sort();
-
-  useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    if (!token) return;
-  }, []);
 
   return (
     <main className="app-page">
