@@ -6,6 +6,12 @@ import Booking from "../models/Booking.js";
 import DailyCapacity from "../models/DailyCapacity.js";
 import Mentor from "../models/Mentor.js";
 import { assertWithinAvailability, parseStartAt } from "../utils/time.js";
+import {
+  mentorBookingEmail,
+  parentBookingEmail,
+} from "../emails/bookingConfirmation.js";
+import Parent from "../models/Parent.js";
+import { sendMail } from "../lib/mailer.js";
 
 async function ensureDailyCapacity(mentorId, localDate) {
   try {
@@ -16,6 +22,22 @@ async function ensureDailyCapacity(mentorId, localDate) {
     );
   } catch (error) {
     if (error.code !== 11000) throw error;
+  }
+}
+
+async function notifyBookingCreated({ booking, mentor, parent }) {
+  const parentContent = parentBookingEmail({ parent, mentor, booking });
+  const mentorContent = mentorBookingEmail({ parent, mentor, booking });
+
+  const results = await Promise.allSettled([
+    sendMail({ to: parent.email, ...parentContent }),
+    sendMail({ to: mentor.email, ...mentorContent }),
+  ]);
+
+  for (const result of results) {
+    if (result.status === "rejected") {
+      console.error("[booking] email send failed:", result.reason);
+    }
   }
 }
 
@@ -95,6 +117,16 @@ export async function createBooking({ parentId, mentorId, startAt }) {
     });
   } finally {
     await session.endSession();
+  }
+
+  const parent = await Parent.findById(parentId).lean();
+
+  if (parent) {
+    notifyBookingCreated({ booking: createdBooking, mentor, parent }).catch(
+      (error) => console.error("[booking] notify failed:", error),
+    );
+  } else {
+    console.warn(`[booking] parent ${parentId} not found; skipping emails`);
   }
 
   return createdBooking;

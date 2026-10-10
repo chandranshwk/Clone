@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import ThemeToggle from "../ThemeToggle";
+import { X } from "lucide-react";
 
 export function Modal({ title, children, onClose, wide = false }) {
   useEffect(() => {
