@@ -1,7 +1,7 @@
 export const SUPPORTED_TIME_ZONES = [
+  "UTC",
   "Asia/Kolkata",
-  "Europe/London",
-  "America/New_York",
+  ...Intl.supportedValuesOf("timeZone"),
 ];
 
 export const ACTIVE_BOOKING_LIMIT = 2;

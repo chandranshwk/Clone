@@ -2016,11 +2016,7 @@ a {
         rgba(246, 242, 234, 0.28) 70%,
         transparent 86%
       ),
-      linear-gradient(
-        90deg,
-        rgba(246, 242, 234, 0.5) 0%,
-        transparent 22%
-      );
+      linear-gradient(90deg, rgba(246, 242, 234, 0.5) 0%, transparent 22%);
   }
   .hero-mentor-overlay {
     right: var(--hero-inset);
@@ -2255,4 +2251,24 @@ a {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+.slot-button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.slot-time-primary {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.slot-time-secondary {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.2;
+  opacity: 0.6;
 }

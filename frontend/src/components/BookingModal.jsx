@@ -6,7 +6,7 @@ import {
   LoaderCircle,
 } from "lucide-react";
 import { todayInTimezone } from "../lib/calendarDate.js";
-import { formatInstant, formatSlot } from "../lib/formatters.js";
+import { formatInstant, formatSlotWithDay } from "../lib/formatters.js";
 import { Modal } from "./Modal.jsx";
 import { BookingDatePicker } from "./BookingDatePicker.jsx";
 import { Loading } from "./Loading.jsx";
@@ -14,6 +14,7 @@ import { InlineError } from "./InlineError.jsx";
 
 export function BookingModal({
   bookingFlow,
+  viewerTimezone,
   onClose,
   onDateChange,
   onSlotSelect,
@@ -41,13 +42,14 @@ export function BookingModal({
           <p className="eyebrow">You’re booked</p>
           <h3>{mentor.name}</h3>
           <p className="confirmation-time">
-            {formatInstant(
-              bookingFlow.booking.startsAt,
-              bookingFlow.booking.timezone,
-            )}
+            {formatInstant(bookingFlow.booking.startsAt, viewerTimezone)}
           </p>
           <p className="confirmation-zone">
-            {bookingFlow.booking.timezone} · 60-minute trial class
+            Your time ({viewerTimezone}) · 60-minute trial class
+          </p>
+          <p className="confirmation-zone-muted">
+            {formatInstant(bookingFlow.booking.startsAt, mentor.timezone)} in{" "}
+            {mentor.timezone}
           </p>
           <div className="booking-id-box">
             <span>CONFIRMATION ID</span>
@@ -93,22 +95,29 @@ export function BookingModal({
               <div className="slot-heading">
                 <div>
                   <h3>{bookingDay}</h3>
-                  <p>Times shown in {mentor.timezone}</p>
+                  <p>
+                    Times shown in your timezone (
+                    {viewerTimezone.replace(/_/g, " ")})
+                  </p>
                 </div>
                 <span>
-                  {bookingFlow.availability.remainingDailyBookings} daily{" "}
+                  {bookingFlow.availability.remainingDailyBookings}{" "}
                   {bookingFlow.availability.remainingDailyBookings === 1
-                    ? "place"
-                    : "places"}{" "}
-                  left
+                    ? "slot"
+                    : "slots"}{" "}
+                  left for this day
                 </span>
               </div>
               {!bookingFlow.availability.availableSlots.length ? (
                 <div className="slot-empty">
                   <CalendarDays size={19} />
-                  <span>
-                    No available times on this date. Choose another day.
-                  </span>
+                  <div>
+                    <strong>No available times on this date</strong>
+                    <p>
+                      Try another day — most mentors have openings within a
+                      week.
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <div className="slot-grid">
@@ -122,7 +131,9 @@ export function BookingModal({
                       }`}
                       onClick={() => onSlotSelect(slot)}
                     >
-                      {formatSlot(slot.startsAt, mentor.timezone)}
+                      <span className="slot-time-primary">
+                        {formatSlotWithDay(slot.startsAt, viewerTimezone)}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -132,13 +143,20 @@ export function BookingModal({
           {bookingFlow.selectedSlot ? (
             <div className="selected-summary">
               <div>
-                <span>Selected time</span>
+                <span>Selected time (your local time)</span>
                 <strong>
+                  {formatInstant(
+                    bookingFlow.selectedSlot.startsAt,
+                    viewerTimezone,
+                  )}
+                </strong>
+                <span className="selected-summary-secondary">
+                  Mentor's time:{" "}
                   {formatInstant(
                     bookingFlow.selectedSlot.startsAt,
                     mentor.timezone,
                   )}
-                </strong>
+                </span>
               </div>
               <button
                 className="button button-primary"

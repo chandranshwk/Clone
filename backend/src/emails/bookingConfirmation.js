@@ -29,6 +29,10 @@ function formatInstant(date, timezone) {
   }).format(date instanceof Date ? date : new Date(date));
 }
 
+function formatZoneLabel(timezone) {
+  return timezone.replace(/_/g, " ");
+}
+
 function classUrl(booking) {
   return `${CLASS_BASE_URL}/${booking.bookingId}`;
 }
@@ -39,11 +43,26 @@ function renderRow(label, value) {
       <td style="padding:8px 0;font-size:13px;color:${MUTED_COLOR};width:120px;vertical-align:top;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
         ${escapeHtml(label)}
       </td>
-      <td style="padding:8px 0;font-size:14px;color:${TEXT_COLOR};font-weight:500;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;word-break:break-word;">
+      <td style="padding:8px 0;font-size:14px;color:${TEXT_COLOR};font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;word-break:break-word;">
         ${value}
       </td>
     </tr>
   `;
+}
+
+function renderTimeRows({ primary, secondary }) {
+  return [
+    renderRow(
+      primary.label,
+      `<strong style="font-weight:600;color:${TEXT_COLOR};">${escapeHtml(primary.value)}</strong><br/>
+       <span style="font-size:12px;color:${MUTED_COLOR};font-weight:400;">${escapeHtml(primary.zone)}</span>`,
+    ),
+    renderRow(
+      secondary.label,
+      `<span style="color:${MUTED_COLOR};font-weight:400;">${escapeHtml(secondary.value)}<br/>
+       ${escapeHtml(secondary.zone)}</span>`,
+    ),
+  ].join("");
 }
 
 function renderLayout({
@@ -144,7 +163,11 @@ function renderLayout({
 }
 
 export function parentBookingEmail({ parent, mentor, booking }) {
-  const when = formatInstant(booking.startsAt, booking.timezone);
+  const parentZone = parent.timezone || "UTC";
+  const mentorZone = booking.timezone;
+
+  const whenParent = formatInstant(booking.startsAt, parentZone);
+  const whenMentor = formatInstant(booking.startsAt, mentorZone);
   const subjects = mentor.subjects.join(", ");
   const joinLink = classUrl(booking);
   const subject = `Your trial with ${mentor.name} is confirmed`;
@@ -154,11 +177,17 @@ export function parentBookingEmail({ parent, mentor, booking }) {
     ``,
     `Your trial class with ${mentor.name} is confirmed.`,
     ``,
-    `When:       ${when} (${booking.timezone})`,
+    `Your local time (${parentZone}):`,
+    `  ${whenParent}`,
+    ``,
+    `Mentor's time (${mentorZone}):`,
+    `  ${whenMentor}`,
+    ``,
     `Subjects:   ${subjects}`,
     `Booking ID: ${booking.bookingId}`,
     ``,
-    `Join the class here: ${joinLink}`,
+    `Join the class here:`,
+    `  ${joinLink}`,
     ``,
     `This is a demo link. It will connect you to the live session at the scheduled time.`,
     ``,
@@ -168,12 +197,22 @@ export function parentBookingEmail({ parent, mentor, booking }) {
   ].join("\n");
 
   const html = renderLayout({
-    preheader: `Your trial with ${mentor.name} on ${when} is confirmed.`,
+    preheader: `Your trial with ${mentor.name} on ${whenParent} (${parentZone}) is confirmed.`,
     heading: "Your trial is confirmed",
     intro: `Hi ${escapeHtml(parent.name)}, your trial class with <strong>${escapeHtml(mentor.name)}</strong> is all set. Use the button below to join at the scheduled time.`,
     rows: [
-      renderRow("When", escapeHtml(when)),
-      renderRow("Timezone", escapeHtml(booking.timezone)),
+      renderTimeRows({
+        primary: {
+          label: "Your local time",
+          value: whenParent,
+          zone: formatZoneLabel(parentZone),
+        },
+        secondary: {
+          label: "Mentor's time",
+          value: whenMentor,
+          zone: formatZoneLabel(mentorZone),
+        },
+      }),
       renderRow("Subjects", escapeHtml(subjects)),
       renderRow(
         "Booking ID",
@@ -189,7 +228,11 @@ export function parentBookingEmail({ parent, mentor, booking }) {
 }
 
 export function mentorBookingEmail({ parent, mentor, booking }) {
-  const when = formatInstant(booking.startsAt, booking.timezone);
+  const parentZone = parent.timezone || "UTC";
+  const mentorZone = booking.timezone;
+
+  const whenMentor = formatInstant(booking.startsAt, mentorZone);
+  const whenParent = formatInstant(booking.startsAt, parentZone);
   const joinLink = classUrl(booking);
   const subject = `New trial booking from ${parent.name}`;
 
@@ -198,11 +241,17 @@ export function mentorBookingEmail({ parent, mentor, booking }) {
     ``,
     `${parent.name} has booked a trial class with you.`,
     ``,
-    `When:       ${when} (${booking.timezone})`,
+    `Your local time (${mentorZone}):`,
+    `  ${whenMentor}`,
+    ``,
+    `Parent's time (${parentZone}):`,
+    `  ${whenParent}`,
+    ``,
     `Student:    ${parent.name} (${parent.email})`,
     `Booking ID: ${booking.bookingId}`,
     ``,
-    `Join the class here: ${joinLink}`,
+    `Join the class here:`,
+    `  ${joinLink}`,
     ``,
     `This is a demo link. It will connect you to the live session at the scheduled time.`,
     ``,
@@ -212,12 +261,22 @@ export function mentorBookingEmail({ parent, mentor, booking }) {
   ].join("\n");
 
   const html = renderLayout({
-    preheader: `New trial booking from ${parent.name} on ${when}.`,
+    preheader: `New trial booking from ${parent.name} on ${whenMentor} (${mentorZone}).`,
     heading: "New trial booking",
     intro: `Hi ${escapeHtml(mentor.name)}, <strong>${escapeHtml(parent.name)}</strong> has booked a trial class with you. Use the button below to join at the scheduled time.`,
     rows: [
-      renderRow("When", escapeHtml(when)),
-      renderRow("Timezone", escapeHtml(booking.timezone)),
+      renderTimeRows({
+        primary: {
+          label: "Your local time",
+          value: whenMentor,
+          zone: formatZoneLabel(mentorZone),
+        },
+        secondary: {
+          label: "Parent's time",
+          value: whenParent,
+          zone: formatZoneLabel(parentZone),
+        },
+      }),
       renderRow(
         "Student",
         `${escapeHtml(parent.name)}<br/><a href="mailto:${escapeHtml(parent.email)}" style="color:${BRAND_COLOR};text-decoration:none;font-size:13px;">${escapeHtml(parent.email)}</a>`,

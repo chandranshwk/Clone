@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { SUPPORTED_TIME_ZONES } from "../constants.js";
 
 const parentSchema = new mongoose.Schema(
   {
@@ -12,6 +13,12 @@ const parentSchema = new mongoose.Schema(
       maxlength: 254,
     },
     passwordHash: { type: String, required: true, select: false },
+    timezone: {
+      type: String,
+      required: true,
+      enum: SUPPORTED_TIME_ZONES,
+      default: "UTC",
+    },
   },
   { timestamps: true },
 );

@@ -5,6 +5,7 @@ import Mentor from "../models/Mentor.js";
 import Parent from "../models/Parent.js";
 import { requireAuth } from "../middleware/auth.js";
 import { comparePassword, hashPassword } from "../utils/passwords.js";
+import { SUPPORTED_TIME_ZONES } from "../constants.js";
 
 const router = Router();
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -15,20 +16,24 @@ function accountResponse(account, role) {
     name: account.name,
     email: account.email,
     role,
-    ...(role === "mentor" ? { timezone: account.timezone } : {}),
+    ...(account.timezone ? { timezone: account.timezone } : {}),
   };
 }
 
 function createToken(account, role) {
-  return jwt.sign({ role }, process.env.JWT_SECRET, {
-    subject: account.id,
-    issuer: "mentormatch",
-    expiresIn: "12h",
-  });
+  return jwt.sign(
+    { role, name: account.name, timezone: account.timezone },
+    process.env.JWT_SECRET,
+    {
+      subject: account.id,
+      issuer: "mentormatch",
+      expiresIn: "12h",
+    },
+  );
 }
 
 router.post("/register", async (request, response) => {
-  const { name, email, password } = request.body ?? {};
+  const { name, email, password, timezone } = request.body ?? {};
   const normalizedEmail =
     typeof email === "string" ? email.trim().toLowerCase() : "";
 
@@ -47,6 +52,11 @@ router.post("/register", async (request, response) => {
     );
   }
 
+  const resolvedTimezone =
+    typeof timezone === "string" && SUPPORTED_TIME_ZONES.includes(timezone)
+      ? timezone
+      : "UTC";
+
   if (
     (await Parent.exists({ email: normalizedEmail })) ||
     (await Mentor.exists({ email: normalizedEmail }))
@@ -62,6 +72,7 @@ router.post("/register", async (request, response) => {
     name: name.trim(),
     email: normalizedEmail,
     passwordHash: await hashPassword(password),
+    timezone: resolvedTimezone,
   });
   const role = "parent";
 

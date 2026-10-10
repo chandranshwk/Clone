@@ -7,11 +7,11 @@ export function formatInstant(value, timezone, options = {}) {
   }).format(new Date(value));
 }
 
-export function formatSlot(value, timezone) {
-  return new Intl.DateTimeFormat(undefined, {
+export function formatSlotWithDay(value, timezone) {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
     hour: "numeric",
     minute: "2-digit",
     timeZone: timezone,
-    timeZoneName: "short",
   }).format(new Date(value));
 }

@@ -62,6 +62,7 @@ function App() {
         _id: payload.sub ?? payload.id ?? payload._id,
         name: payload.name,
         role: payload.role,
+        timezone: payload.timezone ?? "UTC",
       },
     });
     setRestoring(false);
@@ -292,6 +293,7 @@ function App() {
 
       {bookingFlow?.mentor ? (
         <BookingModal
+          viewerTimezone={session.user.timezone}
           bookingFlow={bookingFlow}
           onClose={() => setBookingFlow(null)}
           onDateChange={(date) =>

@@ -27,12 +27,12 @@ export function AuthScreen({
     setBusy(true);
     setError("");
     try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const result =
         mode === "register"
-          ? await api.register({ name, email, password })
+          ? await api.register({ name, email, password, timezone })
           : await api.login({ email, password });
       localStorage.setItem("authToken", result.token);
-      localStorage.setItem("user", JSON.stringify(result.user));
       onAuthenticated(result);
     } catch (requestError) {
       setError(requestError.message);
@@ -167,7 +167,8 @@ export function AuthScreen({
           </form>
         </section>
         <footer className="page-footer">
-          MentorMatch <span>·</span> Find your next great teacher
+          MentorMatch <span>·</span> Better learning begins with the right
+          teacher
         </footer>
       </div>
     </main>
