@@ -1,102 +1,273 @@
 # MentorMatch
 
-MentorMatch is a trial-class booking system with a responsive React/Vite frontend and an Express/Mongoose API. Parents can browse and filter mentors, view local-time availability, book and cancel trials, and review booking history. Mentors can sign in to view and cancel assigned sessions.
+A trial-class booking system built for the Codeyoung Full-Stack Engineer assignment.
+
+Parents browse mentors, view availability in their own timezone, book a one-to-one trial, and receive a confirmation email with a live-class link. Mentors receive the same booking with the parent's name and contact. Both parties see times in both timezones.
+
+- **Frontend:** React 18 + Vite
+- **Backend:** Node.js + Express 5
+- **Database:** MongoDB (Atlas or any replica set — transactions required)
+- **Email:** Nodemailer over SMTP (Gmail, Resend, or any SMTP provider)
+
+---
 
 ## Requirements
 
 - Node.js 20.19+ or 22.12+
 - npm
-- MongoDB Atlas (transactions require a replica set; Atlas provides one)
+- MongoDB Atlas cluster, or any MongoDB deployment with a replica set (transactions require it)
+- An SMTP account for email. Optional — the app runs without it and logs sends instead.
 
-## Configure MongoDB Atlas
+---
 
-1. Create an Atlas cluster and a database user with read/write access to the MentorMatch database.
-2. Add your development machine's public IP under **Network Access**. Avoid allowing access from every IP for production deployments.
-3. In **Connect > Drivers**, copy the Node.js connection string. Replace its username, password, and database name as needed; URL-encode special characters in the username or password.
-4. In `backend`, copy `.env.example` to `.env` and fill in the values below. Keep this file private; it is ignored by Git and must never be placed in the frontend.
+## Setup
 
-PowerShell:
+### 1. Clone and install
 
-```powershell
+```bash
+git clone <repo-url>
+cd <repo-name>
+
+cd backend && npm install
+cd ../frontend && npm install
+```
+
+### 2. Configure MongoDB Atlas
+
+1. Create an Atlas cluster and a database user with read/write access.
+2. Add your machine's public IP under **Network Access**.
+3. From **Connect → Drivers**, copy the Node.js connection string.
+
+### 3. Configure the backend environment
+
+```bash
 cd backend
-Copy-Item .env.example .env
+cp .env.example .env          # Windows PowerShell: Copy-Item .env.example .env
+```
+
+Generate a JWT secret:
+
+```bash
 node -p "require('node:crypto').randomBytes(48).toString('base64url')"
 ```
 
-Paste the generated value into `JWT_SECRET` in `backend/.env`, then set the Atlas URI and two demo passwords:
+Fill in `backend/.env`:
 
 ```dotenv
 PORT=5000
-MONGODB_URI=mongodb+srv://<database-user>:<password>@<cluster-host>/<database-name>
-JWT_SECRET=<generated-random-value-at-least-32-characters>
-DEMO_MENTOR_PASSWORD=<your-demo-mentor-password>
-DEMO_PARENT_PASSWORD=<your-demo-parent-password>
+MONGODB_URI=mongodb+srv://<user>:<password>@<host>/<database>
+JWT_SECRET=<generated-value>
+DEMO_MENTOR_PASSWORD=<your-choice>
+DEMO_PARENT_PASSWORD=<your-choice>
+
+# Optional — email. Leave SMTP_HOST empty to skip sending (logged instead).
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=you@example.com
+SMTP_PASS=<app-password>
+MAIL_FROM="MentorMatch <you@example.com>"
 ```
 
-Choose demo passwords 8 to 72 bytes long. All demo accounts of the same role use their corresponding environment password. No demo passwords or Atlas credentials are stored in source code.
+**`.env` is gitignored. Never commit it. Never expose it to the frontend.**
 
-## Install And Run
+### 4. Seed demo data
 
-Start the API from the project root after configuring `backend/.env`:
-
-```powershell
-cd backend
-npm install
-npm run dev
-```
-
-The API validates its environment and waits for MongoDB and index initialization before listening. It does not report the database as connected unless the connection succeeds.
-
-Start the frontend in a second terminal:
-
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-Open the URL printed by Vite. Its `/api` requests are proxied to `http://localhost:5000`.
-
-In Git Bash or another Unix-like shell, use `cp .env.example .env` in place of PowerShell's `Copy-Item`.
-
-## Seed Demo Accounts
-
-With Atlas configured and the API stopped, run:
-
-```powershell
+```bash
 cd backend
 npm run seed
 ```
 
-This idempotently creates ten mentors across Asia/Kolkata, Europe/London, and America/New_York, plus two parent accounts. Mentor emails follow `firstname.lastname@demo.mentormatch.test`; parent emails are `taylor.morgan@demo.mentormatch.test` and `jordan.lee@demo.mentormatch.test`. Use the `DEMO_MENTOR_PASSWORD` or `DEMO_PARENT_PASSWORD` from the private backend environment file to log in.
+Creates **10 mentors** across Asia/Kolkata, Europe/London, and America/New_York, plus **2 parents**. Idempotent — safe to re-run.
+
+### 5. Run
+
+Backend:
+
+```bash
+cd backend
+npm run dev
+```
+
+Frontend (second terminal):
+
+```bash
+cd frontend
+npm run dev
+```
+
+Open the URL Vite prints. API requests are proxied to `http://localhost:5000`.
+
+### Demo credentials
+
+All demo mentors share `DEMO_MENTOR_PASSWORD`. All demo parents share `DEMO_PARENT_PASSWORD`. Emails follow:
+
+- Mentors: `firstname.lastname@demo.mentormatch.test`
+- Parents: `taylor.morgan@demo.mentormatch.test`, `jordan.lee@demo.mentormatch.test`
+
+For email testing, replace those `.test` addresses in MongoDB Compass with real addresses you control — `.test` is a reserved TLD and will bounce.
+
+---
+
+## Architecture
+
+```
+backend/
+  src/
+    server.js              # Boot: env validation, DB connect, listen
+    app.js                 # Express app, routes, error handler
+    routes/                # auth, mentors, bookings
+    services/
+      bookingService.js    # The only writer of DailyCapacity.
+                           # Atomic capacity guard + transaction live here.
+    middleware/auth.js     # JWT verify, role guard
+    models/                # Mentor, Parent, Booking, DailyCapacity
+    utils/time.js          # Temporal-based timezone + slot arithmetic
+    emails/                # HTML + text templates
+    lib/mailer.js          # Nodemailer transport (cached)
+
+frontend/
+  src/
+    App.jsx                # Session restore, top-level orchestration
+    components/            # BookingModal, MentorDirectory, BookingList, etc.
+    lib/
+      api.js               # Fetch wrapper
+      formatters.js        # Timezone-aware date/time formatting
+```
+
+**Why this shape:** the backend separates HTTP concerns (routes) from domain logic (services). `bookingService.js` owns the booking invariant and is the only place that touches `DailyCapacity` — any other writer would break the concurrency guarantee. Timezone arithmetic lives entirely in `utils/time.js` so all consumers share one implementation.
+
+---
+
+## Key design decisions
+
+### Timezones and DST
+
+Times are stored as UTC instants (`startsAt`, `endsAt`), and each booking also stores the mentor's IANA timezone name (e.g. `America/New_York`) — never a fixed offset.
+
+- **Server:** conversions use `Temporal.ZonedDateTime` from `@js-temporal/polyfill`, which carries the IANA database and applies the correct UTC offset for the specific instant. January renders as `-05:00` (EST), July as `-04:00` (EDT) — same code, no special cases.
+- **Client:** `Intl.DateTimeFormat({ timeZone })` for the same reason.
+- **Spring-forward:** a slot time that doesn't exist on a DST transition day is rejected by the round-trip check in `buildAvailableSlots`.
+- **Fall-back:** a duplicated hour is disambiguated deterministically, and `seenInstants` prevents a slot appearing twice.
+- **Supported zones** come from `Intl.supportedValuesOf("timeZone")`, so the runtime's own IANA list is authoritative. This also avoids a real bug where Node canonicalises `Asia/Kolkata` to `Asia/Calcutta` inconsistently.
+
+### Capacity guard (max 2 trials per mentor per day)
+
+Enforced with a `DailyCapacity` document per mentor per mentor-local date. The reservation is a single atomic operation:
+
+```js
+DailyCapacity.findOneAndUpdate(
+  { mentorId, localDate, activeCount: { $lt: ACTIVE_BOOKING_LIMIT } },
+  { $inc: { activeCount: 1 } },
+  { new: true, session },
+);
+```
+
+If two requests race, MongoDB serialises the updates — only one can observe `activeCount < 2` and succeed. The whole operation runs in a transaction, so a downstream failure rolls the counter back.
+
+Cancellation decrements the counter in the same transaction. The counter is guarded by `{ activeCount: { $gt: 0 } }` so it can never go negative.
+
+**Verified:** a test fires four parallel booking requests and asserts exactly two succeed.
+
+### Booking slot rules
+
+- Slots are 60 minutes (`CLASS_DURATION_MINUTES`), aligned to whole-minute boundaries.
+- Slots must fit entirely inside a mentor's declared availability window for that weekday.
+- Overlap check uses strict comparisons (`$lt` / `$gt`), so back-to-back bookings (10:00–11:00 and 11:00–12:00) don't collide.
+- Past slots are filtered out server-side.
+
+### Email pipeline
+
+Two emails per booking — parent and mentor — sent via Nodemailer over SMTP.
+
+- **Fired after the transaction commits**, not inside it. A DB rollback should not produce a confirmation for a booking that doesn't exist.
+- **Not awaited.** SMTP latency doesn't delay the HTTP response. Individual failures are logged but don't fail the request — the booking is the source of truth.
+- **Both timezones** in each email: recipient's own as the primary line, the other party's as muted reference.
+- **Dummy live-class link** included as a button and as a raw URL (for clients that strip buttons). The brief specifies the link is a placeholder — it does not need to resolve.
+- **Graceful degradation:** if `SMTP_HOST` is unset, the mailer logs the would-be send and returns without throwing, so the app runs without email configuration in development.
+
+### Session restore
+
+The JWT is stored in `localStorage` and decoded client-side on page load to restore the session without a server round-trip. This is safe because:
+
+- The client never trusts the token for authorization — the server re-verifies on every API call.
+- The client-side expiry check is a UX nicety (avoid rendering a dashboard that will immediately 401); the server still enforces expiry.
+- If the token is tampered with, the next API call fails and the user is signed out.
+
+---
 
 ## API
 
-All request and response bodies are JSON. Protected routes take `Authorization: Bearer <token>`. Login/register responses contain a JWT. The frontend keeps the token in React memory for the active page session; refreshing signs the user out. Never put credentials or tokens in source code.
+All bodies are JSON. Protected routes require `Authorization: Bearer <token>`.
 
-| Method | Endpoint                                              | Access                           | Purpose                                                          |
-| ------ | ----------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------- |
-| GET    | `/api/health`                                         | Public                           | API and database readiness                                       |
-| POST   | `/api/auth/register`                                  | Public                           | Create a parent account (`name`, `email`, `password`)            |
-| POST   | `/api/auth/login`                                     | Public                           | Log in a parent or seeded mentor (`email`, `password`)           |
-| GET    | `/api/auth/me`                                        | Authenticated                    | Current account and role                                         |
-| GET    | `/api/mentors?search=&subject=&page=&limit=`          | Public                           | Search and page active mentors                                   |
-| GET    | `/api/mentors/:mentorId/availability?date=YYYY-MM-DD` | Public                           | Mentor-local available/booked slots and remaining daily capacity |
-| POST   | `/api/bookings`                                       | Parent                           | Create a trial booking (`mentorId`, `startAt`)                   |
-| GET    | `/api/bookings?status=active&page=&limit=`            | Authenticated                    | Own parent history or the mentor's bookings                      |
-| DELETE | `/api/bookings/:bookingId`                            | Booking owner or assigned mentor | Cancel an active booking                                         |
+| Method | Endpoint                                              | Access                   | Purpose                                                 |
+| ------ | ----------------------------------------------------- | ------------------------ | ------------------------------------------------------- |
+| GET    | `/api/health`                                         | Public                   | API and DB readiness                                    |
+| POST   | `/api/auth/register`                                  | Public                   | Create parent (`name`, `email`, `password`, `timezone`) |
+| POST   | `/api/auth/login`                                     | Public                   | Log in parent or mentor (`email`, `password`)           |
+| GET    | `/api/auth/me`                                        | Authenticated            | Current account                                         |
+| GET    | `/api/mentors?search=&subject=&page=&limit=`          | Public                   | Search and page active mentors                          |
+| GET    | `/api/mentors/:mentorId/availability?date=YYYY-MM-DD` | Public                   | Slots + remaining daily capacity                        |
+| POST   | `/api/bookings`                                       | Parent                   | Create trial (`mentorId`, `startAt`)                    |
+| GET    | `/api/bookings?status=active&page=&limit=`            | Authenticated            | Own parent history, or mentor's bookings                |
+| DELETE | `/api/bookings/:bookingId`                            | Owner or assigned mentor | Cancel active booking                                   |
 
-`startAt` must be ISO 8601 with `Z` or an explicit UTC offset, for example `2030-01-07T09:00:00+05:30`. The server derives the local date from the mentor's time zone, validates the weekly availability window, and stores UTC instants plus the local date/time. Supported zones are Asia/Kolkata, Europe/London, and America/New_York; IANA time-zone rules handle daylight-saving transitions.
+`startAt` must be ISO 8601 with `Z` or an explicit offset — e.g. `2030-01-07T09:00:00+05:30`. Offset-less strings are rejected to avoid ambiguity.
 
-Booking creation and cancellation run in MongoDB transactions. A unique per-mentor/local-date capacity record is atomically incremented, enforcing no more than two active bookings per mentor per local calendar day even under concurrent requests. Overlapping one-hour appointments are also rejected. Use Atlas or another MongoDB replica set; standalone MongoDB does not support these transactions.
+Errors return `{ "error": { "code": "...", "message": "..." } }`.
 
-Errors use `{ "error": { "code": "...", "message": "..." } }`. The API validates request shapes, dates, roles, and pagination and returns appropriate 4xx responses for invalid or unauthorized requests.
+### Example
+
+```bash
+# Register
+curl -X POST http://localhost:5000/api/auth/register \
+  -H 'content-type: application/json' \
+  -d '{"name":"Test Parent","email":"test@example.com","password":"password123","timezone":"America/New_York"}'
+
+# Book
+curl -X POST http://localhost:5000/api/bookings \
+  -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"mentorId":"...","startAt":"2030-01-07T09:00:00+05:30"}'
+```
+
+---
 
 ## Tests
 
-```powershell
+```bash
 cd backend
 npm test
 ```
 
-The suite uses Node's test runner and a temporary MongoDB replica set to exercise concurrent transactions; the first run may download the MongoDB test binary. These tests do not use your Atlas database. `npm audit` checks backend dependencies.
+Uses Node's built-in test runner against a temporary in-memory MongoDB replica set (transactions require a replica set). First run may download the MongoDB test binary. Does not touch your Atlas cluster.
+
+Coverage includes:
+
+- Registration hashing and protected-route auth
+- Concurrent booking under the daily cap (4 parallel requests, exactly 2 succeed)
+- Cancellation frees capacity
+- Cross-user authorization (mentor can't book; other parent can't cancel)
+- Public mentor listing does not leak `email` / `passwordHash`
+- Slot availability returns the correct offsets
+
+---
+
+## Scope
+
+**Built:** email/password auth, mentor directory with search and subject filter, timezone-aware booking modal, per-mentor-per-day capacity guard, cancellation with capacity release, transactional email to both parties with dual timezones and a dummy class link, DST handling.
+
+**Deliberately not built:** OAuth/social login, password reset, email verification, real-time video (dummy link per the brief), payments, ratings, admin panel, chat, calendar sync. None were requested and each would have diluted the core flow.
+
+---
+
+## AI session transcript
+
+Per the assignment brief, the full AI-assisted session transcript is included as `TRANSCRIPT.md` at the repository root.
+
+---
+
+## Notes
+
+- **Demo emails:** the seed uses `.test` domains, which don't resolve. Replace them in MongoDB Compass with real addresses for email testing.
+- **Email in development:** Gmail SMTP has a low daily limit and often classifies transactional mail as spam. For production, verify a domain and use a transactional provider (Resend, Postmark, SES). The mailer is provider-agnostic — only `.env` changes.
+- **Atlas transactions:** a standalone MongoDB (installed locally without a replica set) will reject the booking transaction. Use Atlas or configure a single-node replica set.
