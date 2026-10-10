@@ -1,5 +1,5 @@
 async function request(path, { method = "GET", token, body } = {}) {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`http://localhost:5000/api${path}`, {
     method,
     headers: {
       ...(body ? { "content-type": "application/json" } : {}),
