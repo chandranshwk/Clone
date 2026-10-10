@@ -126,16 +126,15 @@ export function BookingModal({
                     {viewerTimezone.replace(/_/g, " ")})
                   </p>
                 </div>
-                {/* Capacity counter — the number of trial classes this
-                    mentor can still take today, independent of how many
-                    free windows their schedule contains. */}
-                <span>
-                  {bookingFlow.availability.remainingDailyBookings}{" "}
-                  {bookingFlow.availability.remainingDailyBookings === 1
-                    ? "slot"
-                    : "slots"}{" "}
-                  left for this day
-                </span>
+                {bookingFlow.availability.availableSlots.length > 0 ? (
+                  <span>
+                    {bookingFlow.availability.remainingDailyBookings}{" "}
+                    {bookingFlow.availability.remainingDailyBookings === 1
+                      ? "slot"
+                      : "slots"}{" "}
+                    left for this day
+                  </span>
+                ) : null}
               </div>
               {!bookingFlow.availability.availableSlots.length ? (
                 <div className="slot-empty">
